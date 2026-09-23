@@ -98,7 +98,7 @@ def fallback_split(
 # First, the title line is the ONLY place the building or course name reliably
 # appears. The paragraphs underneath say "the dryers back up on Sunday
 # evenings" without ever saying whose dryers. So a chunk that has been
-# separated from its title has lost the one word that tells eight otherwise
+# separated from its title has lost the one word that tells seven otherwise
 # near-identical laundry documents apart.
 #
 # Second, splitting on blank lines — the obvious move for documents laid out

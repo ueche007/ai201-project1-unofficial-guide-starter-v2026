@@ -24,7 +24,7 @@ contains the answer.
 
 **Why this target:** Two of my five questions (Q1, laundry prices in Calder
 Annexe; Q4, the PHYS 130 exam format) ask about one member of a family of
-near-identical documents. `campus_life` documents eight dorms and nine courses
+near-identical documents. `campus_life` documents seven dorms and nine courses
 in parallel, and the laundry files for Aldridge and Calder differ only in two
 dollar amounts — the rest of the paragraph is word-for-word the same. Retrieval
 has to separate documents that are mostly the same text, so I'm allowing for one
@@ -109,7 +109,7 @@ check it by hand against the corpus file, because only I know which file holds
 the real answer.
 
 **Why this target:** Criterion 2 is satisfied by naming any source at all, and
-on this corpus that is close to free. `campus_life` has eight dorms and nine
+on this corpus that is close to free. `campus_life` has seven dorms and nine
 courses written up in parallel with near-identical wording, so an answer about
 laundry prices that cites *some* laundry document looks completely correct until
 you check which building it is. Aldridge charges $1.75 to wash and Calder

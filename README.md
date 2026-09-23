@@ -1,19 +1,6 @@
 # The Unofficial Guide
 
-<!-- Replace this line with your name and which corpus you picked. -->
-
-> **This file is your submission.** Fill it in as you go — most sections get
-> written during the milestone that produces them, not at the end.
->
-> How the starter works, and every command you'll need, is in `RUNNING.md`.
-> Leave that file alone.
->
-> **Paste everything as text.** No screenshots, no video. A typed table gets
-> full credit; a picture of the same table gets none.
->
-> Delete these instruction blocks as you replace them. The `<!-- -->` comments
-> are notes to you and don't show up when the page renders — you can leave them
-> or remove them.
+Ulysses Echeverria — corpus: `campus_life`
 
 ---
 
@@ -21,109 +8,281 @@
 
 ## What This Does
 
-<!-- Three or four sentences. Which corpus you picked, and the kinds of
-     questions your system answers. Write it for someone who has never seen
-     this repo.
+This is a question-answering system over `campus_life`, a corpus of 88 short
+posts in which students explain the parts of university life that nobody
+documents properly — which dining hall has a twenty-minute queue at 12:15, what
+a wash costs in each dorm, how many hours a week a given course really takes,
+and the administrative rules (pass/fail deadlines, the housing lottery, printing
+quotas) that students learn from each other rather than from the registrar.
 
-     Milestone 5. -->
+You ask it a question in plain English. It finds the handful of posts closest in
+meaning to what you asked, hands those to a language model, and gets back an
+answer that names the file it came from. If nothing in the corpus is close
+enough to your question, it refuses instead of guessing — ask it about diesel
+engines and it will tell you it doesn't know rather than improvise from a post
+about meal plan changes.
 
 ## Chunking Strategy
 
-**Chunk size:**
-**Overlap:**
+**Chunk size:** 600 characters — a ceiling this corpus never actually reaches
+**Overlap:** 0 characters
 
-<!-- What about YOUR documents made you pick these numbers? Short posts and
-     long sectioned guides don't want the same chunking, and "800 seemed
-     reasonable" earns nothing. Point at something you noticed when you read
-     the documents in Milestone 1.
+Every document in `campus_life` has the same shape: a short title line naming
+the thing, a blank line, then two or three short paragraphs.
 
-     If you changed your mind partway through, say so and say why. That's worth
-     more than pretending you got it right first time.
+```
+Laundry in Calder Annexe
 
-     Milestone 3. -->
+Machines take $2.00 wash, $1.75 dry, app-based. There are eight washers
+and six dryers for the building, which is the wrong ratio and means the
+dryers back up on Sunday evenings.
+
+Best time to do laundry here is Tuesday or Wednesday morning. Sunday
+after 6pm you will wait.
+```
+
+Two things I noticed reading these decided the whole strategy.
+
+**The documents are tiny.** All 88 run between 178 and 549 characters, mean 317.
+Not one reaches the starter's 800-character window, so `fallback_split` was
+never cutting anything at all — 88 documents in, 88 chunks out. The default
+wasn't working badly, it wasn't running.
+
+**The title line is load-bearing.** It is the only place the building or course
+name reliably appears. Look at the laundry document above: the second paragraph
+says "the dryers back up on Sunday evenings" without ever saying *whose* dryers.
+And that paragraph is not unique — it appears word-for-word in seven different
+dorms' laundry files. I counted the whole corpus: 25 of 183 body paragraphs
+(14%) appear verbatim in more than one document, one of them in nine.
+
+**I changed my mind here, and the measurement is why.** My first instinct was
+that documents this short and this cleanly laid out obviously wanted splitting
+on blank lines — one paragraph, one idea, one chunk. I expected the failure to
+be wrong attribution: seven identical "Sunday evenings" paragraphs with seven
+different filenames, and no way for retrieval to tell them apart.
+
+So I built it and measured it before committing to it. The result was 271
+chunks — and **88 of them (32%) were a bare title line with no content under
+it.** The shortest was 10 characters. Worse, they *win*: I probed the
+paragraph-split index with eight questions and a content-free heading ranked #1
+for four of them.
+
+```
+[orphan ranked #1]  "how much does a wash cost in Calder Annexe?"
+                     -> chunk text: "Laundry in Calder Annexe"       (24 chars)
+[orphan ranked #1]  "how noisy is Tamsin Court?"
+                     -> chunk text: "Noise levels in Tamsin Court"   (28 chars)
+```
+
+Those chunks match the question almost perfectly, because a title is a pure
+statement of topic. They also answer nothing whatsoever. My predicted failure
+(wrong attribution) barely materialised; the failure I hadn't predicted was
+worse, and I'd have shipped it if I'd trusted the reasoning instead of the
+count.
+
+So `chunker.py::split_documents` does this instead:
+
+1. Peel the title line off the document.
+2. If title + body fits under the 600-character ceiling, **the document stays
+   whole**. On this corpus that is all 88 of them.
+3. If it doesn't fit, pack *whole paragraphs* up to the ceiling, only ever
+   splitting inside a paragraph on a sentence boundary.
+4. **Staple the title line back onto every piece**, so no chunk can lose the
+   name of the building or course it describes.
+5. Merge anything under 100 characters into its neighbour, which makes an
+   orphan chunk impossible by construction rather than by luck.
+
+Rules 2–5 mean this corpus is never cut, which sounds like doing nothing and
+isn't: the work is in rules 4 and 5, which are what stop the obvious approach
+from wrecking retrieval. To check the splitting path isn't dead code I ran the
+same chunker over `city_guides`, whose documents average 2,068 characters: 14
+documents became 61 chunks, still 0 under the floor and still 0 missing their
+title.
+
+**Why 600 and why zero overlap.** 600 sits just above the longest document
+(549), so every post stays whole, while still bounding a chunk if I add a longer
+document later. Overlap is 0 because overlap exists to stop a fact being severed
+at a cut point, and this strategy makes no cuts — there is nothing to sever.
+Non-zero overlap would actively hurt here: duplicating text across boundaries
+would add more near-identical vectors to a corpus whose central retrieval
+problem is already near-identical vectors.
 
 ## Sample Chunks
 
-<!-- Five chunks, pasted as text. Label each one and name the file it came from
-     AND the function that produced it — the grader checks your code against
-     what you claim here.
+From `python app.py chunks -n 5`. Every one carries its title line and reads as
+a complete thought on its own — which is criterion 4, and the whole point of the
+strategy above.
 
-     `python app.py chunks -n 5` prints all three for you. Copy them straight
-     across.
-
-     Milestone 3. -->
-
-**Chunk 1** — source: `` — produced by: ``
+**Chunk 1** — source: `admin_add_drop_deadline.txt#0` — produced by: `chunker.py::split_documents`
 
 ```
+On the add/drop deadline
+
+You can add a course through the end of the second week. Dropping is a longer window — through the end of week six — but a drop after week two shows as a W on your transcript. Nothing anywhere on the registrar's site says this plainly, and students find out from each other.
 ```
 
-**Chunk 2** — source: `` — produced by: ``
+**Chunk 2** — source: `course_biol_160.txt#0` — produced by: `chunker.py::split_documents`
 
 ```
+BIOL 160 Cell Biology
+
+I lived here my sophomore year. Format is lecture three times a week with a weekly lab. Assessment: four unit tests and a cumulative final. Not curved.
+
+Expect 9 to 11 hours a week, the heaviest first-year course by reputation.
+
+The one piece of advice: the unit tests come fast, roughly every three weeks; falling behind once is very hard to recover from.
 ```
 
-**Chunk 3** — source: `` — produced by: ``
+**Chunk 3** — source: `course_hist_118_workload.txt#0` — produced by: `chunker.py::split_documents`
 
 ```
+Workload for HIST 118 Modern World History
+
+People keep asking so: a lot of reading, about 120 pages a week, but no problem sets. That's real time, not optimistic time.
+
+It's front-loaded — the first month is heavier than the rest, partly because you're learning the format.
 ```
 
-**Chunk 4** — source: `` — produced by: ``
+**Chunk 4** — source: `dining_pellew_dining_hall_followup.txt#0` — produced by: `chunker.py::split_documents`
 
 ```
+Re: Pellew Dining Hall
+
+Adding to what people have said about Pellew Dining Hall. The wait figure of 12 to 18 minutes at peak matches what I've seen. If you're trying to eat between classes, go before 11:45 and it's a different building entirely.
+
+Also worth saying: the furthest hall from anywhere, next to the athletics centre. Nobody tells you this at orientation.
 ```
 
-**Chunk 5** — source: `` — produced by: ``
+**Chunk 5** — source: `housing_innisfree_hall.txt#0` — produced by: `chunker.py::split_documents`
 
 ```
+Innisfree Hall — what it's actually like
+
+Transferred in last year, so take this with a grain of salt. Built 1991, renovated 2022. Rooms are doubles arranged as pairs sharing one bathroom between two rooms.
+
+The good: the shared-bathroom-between-two-rooms arrangement is the best compromise on campus.
+
+The bad: no air conditioning, which matters for the first three weeks of September.
+
+Laundry costs $1.75 wash, $1.75 dry, app-based. On noise: moderate; the building is L-shaped and the short wing is much quieter.
 ```
+
+Chunk 3 is the one that makes the case. Its second paragraph — "It's
+front-loaded…" — is identical in all nine course workload files. On its own it
+is unattributable. Kept under its title line it is unambiguous.
 
 ## Sample Answer
 
-<!-- One complete question and answer, pasted as text, with the source line
-     visible. Milestone 4. -->
+**Question:** What does a wash cost in Calder Annexe?
 
-**Question:**
-
-**Answer:**
+**Answer:** (from `python app.py ask "What does a wash cost in Calder Annexe?"`)
 
 ```
+  (best distance 0.254, cutoff 0.7)
+
+A wash costs $2.00 in Calder Annexe (housing_calder_annexe.txt and housing_calder_annexe_laundry.txt).
+
+Sources retrieved: housing_aldridge_hall_laundry.txt, housing_calder_annexe.txt, housing_calder_annexe_laundry.txt, housing_innisfree_hall_laundry.txt, housing_old_brewhouse_laundry.txt
 ```
 
-**My relevance cutoff:**
+I picked this one because it's the question I most expected to fail. Three of
+the five chunks retrieved are laundry posts for the *wrong* buildings — Aldridge
+($1.75), Innisfree ($1.75), Old Brewhouse ($1.50) — and they're near-identical
+prose to the right one. The model had four different wash prices in front of it
+and picked the right one, and both files it cites genuinely contain `$2.00`.
 
-<!-- The number you set in config.py, and how you got there.
-
-     You ran five questions your corpus covers and the five in OUT_OF_SCOPE
-     that it clearly doesn't, and wrote down the best distance for each. What
-     did those two groups look like? Where was the gap? Put the actual numbers
-     here — the table below wants all ten rows.
-
-     Milestone 4. -->
+**My relevance cutoff:** `THRESHOLD = 0.70`
 
 | Question | In corpus? | Best distance |
 |---|---|---|
-|  |  |  |
+| What does a wash cost in Calder Annexe? | Yes | 0.2542 |
+| How late can I declare a course pass/fail, and what grade do I need to pass it? | Yes | 0.2087 |
+| How often does the campus shuttle run on weekends? | Yes | 0.4114 |
+| How many midterms does PHYS 130 have, and is there a final? | Yes | 0.2843 |
+| How many two-hour blocks can one person book in a group study room each week? | Yes | 0.1868 |
+| What is the capital of Mongolia? | No | 0.8246 |
+| How do I change the oil in a diesel engine? | No | 0.9340 |
+| Who won the 1994 World Cup? | No | 0.8859 |
+| What is the recommended dosage of ibuprofen for a headache? | No | 0.8442 |
+| How do I write a for loop in Rust? | No | 0.8960 |
+
+In corpus: **0.187 – 0.411.** Out of corpus: **0.825 – 0.934.** A gap 0.41 wide
+with nothing whatsoever inside it.
+
+That gap is wider than I predicted. Writing criterion 3 I argued `campus_life`
+is broad enough that an outside question could drift toward it on vocabulary
+alone — ibuprofen toward the health centre post, Rust toward CS 210 — and that I
+might have to accept one leak. Neither happened: ibuprofen landed at 0.844 (on
+`money_textbooks.txt`, of all things) and Rust at 0.896. The prediction was
+wrong and the criterion was more pessimistic than it needed to be.
+
+**Why 0.70 and not the midpoint.** The midpoint of the gap is 0.618, which is
+roughly the shipped default, and taking it would have been the obvious move. I
+didn't, because the two groups aren't equally stable. My five test questions are
+written carefully; real ones aren't. So I re-asked the same facts the way a
+person actually types:
+
+| Typed question | Best distance | Top source |
+|---|---|---|
+| `laundry calder how much` | 0.1979 | housing_calder_annexe_laundry.txt |
+| `can i still switch to pass fail after midterms??` | 0.5002 | admin_pass_fail_option.txt |
+| `shuttle weekend` | 0.5421 | transit_shuttle.txt |
+| `phys 130 final exam?` | 0.3080 | course_phys_130.txt |
+| `is the food at the atrium any good` | 0.4538 | dining_the_atrium.txt |
+| `what happens if i drop a class late` | 0.4119 | admin_add_drop_deadline.txt |
+
+The same fact moves from 0.19 to 0.54 depending on phrasing, and every one of
+these is a question the corpus definitely answers. The out-of-scope group didn't
+move at all — it never came below 0.825 however I phrased it. **In-corpus
+distance is sensitive to phrasing; out-of-corpus distance isn't.** So the cutoff
+belongs high in the gap, not in the middle of it.
+
+0.70 leaves 0.16 of headroom above the worst genuine question I could produce
+and still sits 0.12 clear of the nearest out-of-scope one. The default 0.6 would
+have left 0.06 and refused `shuttle weekend`. At 0.70 the gate refuses 5 of 5
+out-of-scope questions and admits 5 of 5 real ones.
 
 ## How I Used AI
 
-<!-- Two specific moments. For each: what you asked for, what came back, and
-     what you changed about it.
+**1. The chunker, where the reasoning was confident and wrong.** I described the
+corpus structure to Claude — title line, blank line, short paragraphs — and
+asked it to design a chunking strategy. It came back with paragraph-splitting
+and a good-sounding argument: each paragraph is one idea, the documents are
+already laid out that way, splitting on blank lines respects the author's own
+structure. It also predicted the failure mode would be wrong source attribution,
+because the dorm families share paragraphs verbatim.
 
-     "I asked Claude to write the chunking function from my notes. It ignored
-     the overlap, so I added that myself" is the level of detail we're after.
-     "I used AI to help me code" is not.
+Rather than build it, I asked for a script that would build it as a throwaway
+index and count what came out. That changed the answer. Paragraph-splitting
+produced 271 chunks of which 88 — every title line in the corpus — were
+content-free headings, and those headings ranked #1 for four of eight probe
+questions. The predicted failure (wrong attribution) hardly showed up at all.
+The argument had been entirely plausible and the measurement contradicted it, so
+the strategy I actually shipped is close to the opposite: keep documents whole,
+and make short chunks impossible by construction. The thing AI was most useful
+for here was writing the experiment that proved its own suggestion wrong.
 
-     Milestone 5. -->
+**2. The threshold, where the textbook answer was the wrong one.** Once I had
+the two groups of distances — 0.187–0.411 in corpus, 0.825–0.934 out — I gave
+them to Claude and asked where the cutoff belonged. It said the midpoint, 0.618,
+and the reasoning was sound as far as it went: the gap is empty, the midpoint
+maximises the margin on both sides, and it's more or less what the milestone
+instructions describe when they say to put the cutoff in the gap.
 
-**1.**
+What bothered me is that it treats the two groups as if they're the same kind of
+thing. My five test questions are written carefully, once, by me. Real questions
+aren't. So before accepting 0.618 I re-asked the same facts the way someone
+actually types them — `shuttle weekend`, `can i still switch to pass fail after
+midterms??` — and the in-corpus distances climbed to 0.542 for facts the corpus
+definitely contains, while the out-of-scope group didn't move at all. The gap
+isn't symmetric, so its midpoint isn't the right place to stand.
 
-**2.**
+I moved the cutoff to 0.70 and wrote the six awkward phrasings into the README
+as the evidence. What I changed wasn't really the number — it was noticing that
+a recommendation can be correct about the data I handed over and still wrong
+about the data I hadn't thought to collect.
 
-<!-- ── Stretch features ─────────────────────────────────────────────────────
-     Doing one? Say so here BEFORE you start. A feature this README never
-     claims earns nothing.
-     ───────────────────────────────────────────────────────────────────────── -->
+<!-- No stretch features attempted in unit 1. -->
 
 ---
 
