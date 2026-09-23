@@ -55,10 +55,28 @@ TOP_K = 5               # how many chunks to pull back per question
 #
 # LOWER IS BETTER: 0.3 is a close match, 0.9 is unrelated.
 #
-# 0.6 is a reasonable starting point, not a right answer. Milestone 4 has you
-# measure your own two groups of distances and put the cutoff in the gap.
-# Most corpora land somewhere between 0.45 and 0.75.
-THRESHOLD = 0.6
+# Milestone 4, measured on campus_life at the chunking above.
+#
+#   my 5 test questions   0.187 .. 0.411
+#   the 5 OUT_OF_SCOPE    0.825 .. 0.934
+#
+# A gap 0.41 wide, which is wider than I expected when I wrote criterion 3 —
+# I'd guessed the ibuprofen and Rust questions would drift toward the health
+# centre and CS 210 documents, and neither did (0.844 and 0.896).
+#
+# The midpoint of that gap is 0.618, but the midpoint is the wrong answer. The
+# two groups are not equally stable. Re-asking my own questions the way someone
+# actually types them ("shuttle weekend", "can i still switch to pass fail
+# after midterms??") pushed in-corpus distances as far as 0.542 for facts the
+# corpus definitely contains, while the out-of-scope group never came below
+# 0.825 however I phrased it. In-corpus distance is sensitive to phrasing;
+# out-of-scope distance isn't.
+#
+# So the cutoff goes above the midpoint, not at it: 0.70 leaves 0.16 of room
+# above the worst real question I could produce and still sits 0.12 clear of
+# the nearest out-of-scope one. The shipped 0.6 would have left only 0.06 of
+# headroom and refused a sloppily-typed question about the shuttle.
+THRESHOLD = 0.70
 
 
 # ─── Models ──────────────────────────────────────────────────────────────────
