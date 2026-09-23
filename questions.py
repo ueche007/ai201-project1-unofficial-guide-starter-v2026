@@ -22,12 +22,31 @@ names a target of "4 of 5", and four of three is not a thing.
 """
 
 QUESTIONS = [
-    # {"question": "...", "expects": "..."},
-    {"question": "", "expects": ""},
-    {"question": "", "expects": ""},
-    {"question": "", "expects": ""},
-    {"question": "", "expects": ""},
-    {"question": "", "expects": ""},
+    # Q1 and Q4 are deliberately the hard ones. campus_life has eight dorms and
+    # nine courses documented with near-identical wording, so the risk isn't
+    # finding *a* relevant chunk — it's finding the right building's chunk.
+    {
+        "question": "What does a wash cost in Calder Annexe?",
+        "expects": "$2.00",
+    },
+    {
+        "question": "How late can I declare a course pass/fail, "
+                    "and what grade do I need to pass it?",
+        "expects": "week eight",
+    },
+    {
+        "question": "How often does the campus shuttle run on weekends?",
+        "expects": "40 minutes",
+    },
+    {
+        "question": "How many midterms does PHYS 130 have, and is there a final?",
+        "expects": "three midterms",
+    },
+    {
+        "question": "How many two-hour blocks can one person book "
+                    "in a group study room each week?",
+        "expects": "two",
+    },
 ]
 
 # Questions from a different world entirely. Your gate should refuse all five.

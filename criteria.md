@@ -22,9 +22,15 @@ pipeline earns credit; *"80% seemed reasonable"* does not.
 For at least 4 of my 5 test questions, the retrieved chunks include one that
 contains the answer.
 
-**Why this target:**
-<!-- e.g. "One of my questions is about a topic only two documents mention, so
-     I expect that one to be hard." -->
+**Why this target:** Two of my five questions (Q1, laundry prices in Calder
+Annexe; Q4, the PHYS 130 exam format) ask about one member of a family of
+near-identical documents. `campus_life` documents eight dorms and nine courses
+in parallel, and the laundry files for Aldridge and Calder differ only in two
+dollar amounts — the rest of the paragraph is word-for-word the same. Retrieval
+has to separate documents that are mostly the same text, so I'm allowing for one
+of those two to come back with a sibling building's chunk instead. I'm not
+setting it at 3 of 5, because the distinguishing name sits in each document's
+title line, and that gives retrieval something real to grip.
 
 ---
 
@@ -32,9 +38,15 @@ contains the answer.
 
 Every answer the system produces names at least one source document.
 
-**Why this target:**
-<!-- Why all five and not four? What about your setup makes that achievable —
-     or what would have to go wrong for it not to be? -->
+**Why this target:** All five and not four, because this one doesn't depend on
+retrieval being good — only on the prompt being obeyed. `generate.py` puts the
+source filenames in the prompt and asks for them back, and every chunk carries
+its filename in metadata through `store.py::search`, so a missing source means
+the model ignored an instruction rather than that the pipeline lost the
+information. One failure out of five would be a real defect worth chasing, so I
+don't want a target that lets me shrug at it. Note this criterion only asks that
+a source is *named* — whether it's the *right* source is criterion 5, and on
+this corpus those are genuinely different questions.
 
 ---
 
@@ -49,48 +61,64 @@ in at least 4 of 5 tries.
      what happened into your run log. Swap them for your own if you'd rather —
      just keep five of them, or the "4 of 5" above has nothing to be 4 of. -->
 
-**Why this target:**
-<!-- What did your distances look like when you set the cutoff in Milestone 4?
-     Was there a clean gap, or did the two groups overlap? -->
+**Why this target:** 4 of 5 rather than 5 of 5 because one cutoff has to serve
+two jobs that pull against each other. `campus_life` is a broad corpus — dining,
+dorms, courses, money, transit, health, weather — so a question from outside it
+can still land near something on vocabulary alone. "What is the recommended
+dosage of ibuprofen for a headache?" has a health centre document to drift
+toward, and "How do I write a for loop in Rust?" has CS 210. I expect those two
+to be the closest of the five out-of-scope questions, and a cutoff loose enough
+to answer my real questions may not refuse both. I'd rather set the cutoff where
+the in-corpus questions all still work and accept one leak than refuse a genuine
+question to protect this number.
 
----
-
-## 4. Something about your chunks
-
-<!-- YOU WRITE THIS ONE.
-
-     How would you know if your chunks were the right size? Name something
-     countable or observable.
-
-     Examples of the right shape — don't copy these, they should come from
-     what you actually saw in Milestone 3:
-       - "At least 4 of 5 sampled chunks read as a complete thought, with no
-          sentence cut in half at either end."
-       - "No chunk is shorter than 200 characters, since anything below that
-          in my corpus turned out to be a heading with no content under it." -->
-
-
-
-**Why this target:**
-
+<!-- The actual distances, and where the gap turned out to be, are measured in
+     Milestone 4 and recorded in the README's ten-row table. -->
 
 
 ---
 
-## 5. Your choice
+## 4. No chunk is a heading with nothing under it
 
-<!-- YOU WRITE THIS ONE TOO.
+Every chunk my chunker produces is at least 100 characters long **and** contains
+the title line of the document it came from. Zero chunks out of however many are
+title-only. I check this by running the chunker over the whole corpus and
+counting, not by eyeballing the five I paste into the README.
 
-     Pick something you actually care about getting right. It could be about
-     speed, about refusals, about a particular kind of question your corpus
-     handles badly, about source attribution being correct rather than merely
-     present — anything, as long as it names a number or an observable
-     outcome. -->
+**Why this target:** All 88 documents in `campus_life` are built the same way: a
+short title line naming the thing ("Laundry in Calder Annexe", "On the printing
+quota"), a blank line, then two or three short paragraphs. That title line is
+the only place the specific building or course name reliably appears — the
+paragraphs underneath say "the dryers back up on Sunday evenings" without ever
+repeating which building's dryers.
 
+So the title line is doing two jobs at once, and any chunking rule that splits
+on blank lines breaks both. It strands the title as a chunk with no content in
+it, and it strips the identifying name off the paragraph that actually holds the
+answer. 100 characters is the floor because the shortest *complete* document in
+the corpus is 178 characters; anything that comes out under 100 can't be a whole
+document and is therefore a fragment of one.
 
+---
 
-**Why this target:**
+## 5. The source named is the source the answer came from
 
+For all 5 of my test questions, the document named in the answer is the document
+that actually contains the answer — not merely a plausible-looking neighbour. I
+check it by hand against the corpus file, because only I know which file holds
+the real answer.
+
+**Why this target:** Criterion 2 is satisfied by naming any source at all, and
+on this corpus that is close to free. `campus_life` has eight dorms and nine
+courses written up in parallel with near-identical wording, so an answer about
+laundry prices that cites *some* laundry document looks completely correct until
+you check which building it is. Aldridge charges $1.75 to wash and Calder
+charges $2.00, and a confident answer citing the wrong file is worse than a
+refusal, because there's nothing in the output that signals it's wrong.
+
+All 5 and not 4 because this is the failure mode I'd most want to know about,
+and grading it leniently would hide exactly the thing I built the criterion to
+catch. If I miss it, I'd rather the number say so.
 
 
 ---
