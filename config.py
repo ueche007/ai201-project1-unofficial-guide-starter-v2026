@@ -27,8 +27,23 @@ CORPUS = os.getenv("AI201_CORPUS", "campus_life")
 # These are deliberately plain, generic numbers. Milestone 3 is where you
 # replace them with numbers that fit the documents you actually read.
 
-CHUNK_SIZE = 800        # characters per chunk
-CHUNK_OVERLAP = 120     # characters shared between neighbouring chunks
+# Milestone 3, measured against campus_life: 88 documents, mean 317 characters,
+# longest 549, shortest 178. Nothing here comes close to the 800 default, so the
+# starter's chunker never cut anything — 88 documents in, 88 chunks out.
+#
+# 600 is a CEILING this corpus never reaches, chosen just above the longest
+# document so every one stays whole, and low enough to still bound a chunk if I
+# add a longer document later. See chunker.py::split_documents for why keeping
+# them whole is the point rather than an accident.
+CHUNK_SIZE = 600        # characters per chunk
+
+# Zero, deliberately. Overlap exists so a fact isn't severed at a cut point, and
+# this strategy makes no cuts on this corpus — there is nothing to sever. Worse,
+# campus_life already has 25 body paragraphs that appear word-for-word in more
+# than one document (one of them in nine), so duplicating text across chunk
+# boundaries would add near-identical vectors to a corpus whose main retrieval
+# problem is already near-identical vectors.
+CHUNK_OVERLAP = 0       # characters shared between neighbouring chunks
 
 
 # ─── Retrieval (Milestone 4) ─────────────────────────────────────────────────
