@@ -294,27 +294,99 @@ about the data I hadn't thought to collect.
 
 ## Run Log — Before
 
-<!-- Your five criteria, three runs each. `python run_eval.py --label before`
-     runs the questions, puts the OUT_OF_SCOPE ones through the gate, and
-     writes it all into results/ for you. Targets come from criteria.md; the
-     verdict column is your call.
-
-     Criterion 3 is measured in one deterministic pass rather than three, so
-     the same number goes in all three run columns. That's correct, not lazy.
-
-     Milestone 1. -->
+`python run_eval.py --label before` → [`results/run_2026-09-23_2139_before.md`](results/run_2026-09-23_2139_before.md).
+15 model calls, cache off, 9,227 tokens.
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1. Retrieved chunk contains the answer | 4 of 5 |  |  |  |  |
-| 2. Every answer names a source | 5 of 5 |  |  |  |  |
-| 3. Gate stops out-of-corpus questions | 4 of 5 |  |  |  |  |
-| 4. | | | | | |
-| 5. | | | | | |
+| 1. Retrieved chunk contains the answer | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 2. Every answer names a source | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 3. Gate stops out-of-corpus questions | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 4. No chunk is a heading with nothing under it | 0 orphans of 88 | 0/88 | 0/88 | 0/88 | MET |
+| 5. The cited source contains the answer | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
 
-<!-- Underneath, paste the REAL output for each criterion from one of your
-     runs — the actual text your system produced, not a description of it.
-     Name the file and function that produced it. -->
+Criteria 1, 3 and 4 are the same in all three columns, and that's correct
+rather than lazy. Retrieval is deterministic, the gate is a comparison against
+a fixed number, and the chunker is a pure function of the documents — none of
+them can vary between runs. Only 2 and 5 depend on the model, and those are the
+ones I expected to move. They didn't.
+
+**A note on how these were scored.** `run_eval.py` gives one pass/fail per
+*question* via `scorer.py::judge`; the table above is one row per *criterion*,
+so criteria 1, 2, 4 and 5 were aggregated from the run-log transcript rather
+than read off it. Criterion 1 is measured against the retrieved chunks
+(`store.py::search`), not the answer text — a correct answer built from a chunk
+that doesn't contain the fact would pass criterion 2 and fail criterion 1, and
+I wanted those separable.
+
+I also had to fix `scorer.py` before trusting any of this. My first version
+read `answer or "".lower` — missing parentheses, so an empty answer raised
+`TypeError` instead of scoring False — and it lowercased `expects` but not
+`answer`, so "week eight" scored True while "Week eight" scored False. The
+model's capitalisation varies between runs, so that bug would have turned
+formatting into correctness in the exact number Milestone 1 asks me to test
+three times. Found by testing the scorer against hand-written cases rather than
+by reading it.
+
+### Real output
+
+**Criterion 1 and 5** — produced by `run_eval.py::run_once`, retrieval by
+`store.py::search`, chunks by `chunker.py::split_documents`. This is the
+question I expected to fail: three of the five chunks retrieved are laundry
+posts for the *wrong* buildings, at $1.75, $1.75 and $1.50.
+
+```
+### What does a wash cost in Calder Annexe? — run 1
+
+- Best distance: 0.2542 (passed the gate)
+- Sources retrieved: housing_aldridge_hall_laundry.txt, housing_calder_annexe.txt, housing_calder_annexe_laundry.txt, housing_innisfree_hall_laundry.txt, housing_old_brewhouse_laundry.txt
+
+A wash costs $2.00 in Calder Annexe. 
+
+Sources: housing_calder_annexe_laundry.txt, housing_calder_annexe.txt
+```
+
+**Criterion 2** — produced by `generate.py::answer_from_chunks`. All 15
+question-runs named at least one source. Run 3 of the same question shows the
+format drifting while the citation stays correct:
+
+```
+A wash costs $2.00 in Calder Annexe (housing_calder_annexe.txt and housing_calder_annexe_laundry.txt).
+```
+
+```
+### How late can I declare a course pass/fail, and what grade do I need to pass it? — run 1
+
+- Best distance: 0.2087 (passed the gate)
+- Sources retrieved: admin_add_drop_deadline.txt, admin_declaring_a_major.txt, admin_grade_appeals.txt, admin_graduation_requirements.txt, admin_pass_fail_option.txt
+
+You can declare a course pass/fail as late as week eight, and you need a grade of C- or better to pass. 
+
+Source: admin_pass_fail_option.txt
+```
+
+**Criterion 3** — produced by `run_eval.py::check_out_of_scope`, cutoff 0.70,
+one deterministic pass. No model calls: a refused question never reaches the
+model.
+
+```
+| Out-of-scope question | Best distance | Gate |
+|---|---|---|
+| What is the capital of Mongolia? | 0.825 | refused |
+| How do I change the oil in a diesel engine? | 0.934 | refused |
+| Who won the 1994 World Cup? | 0.886 | refused |
+| What is the recommended dosage of ibuprofen for a headache? | 0.844 | refused |
+| How do I write a for loop in Rust? | 0.896 | refused |
+```
+
+**Criterion 4** — produced by `chunker.py::split_documents`, counted over all
+88 chunks rather than the 5 I sampled:
+
+```
+chunks: 88; under 100 chars: 0; missing title: 0
+shortest chunk: 178 chars
+=> 0 orphans
+```
 
 ## Verdicts
 
