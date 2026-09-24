@@ -282,7 +282,38 @@ as the evidence. What I changed wasn't really the number — it was noticing tha
 a recommendation can be correct about the data I handed over and still wrong
 about the data I hadn't thought to collect.
 
-<!-- No stretch features attempted in unit 1. -->
+<!-- No stretch features attempted in unit 1 or unit 2. -->
+
+### Added in unit 2
+
+**3. Arguing against my own verdict, which changed it.** I had criterion 5
+scored 5/5, 5/5, 5/5 and MET. Before committing that I pasted the criterion, the
+target, the three runs and my verdict into Claude and asked it to argue the
+opposite as strongly as it could.
+
+The argument it came back with was one I couldn't answer: every answer named two
+or three files, so "did it name a correct source" is nearly free, and my
+criterion contains the words *not merely a plausible-looking neighbour* — which
+only mean something if I check the files that aren't correct. I rescored it that
+way and found `course_phys_130_workload.txt`, cited as a source for exam format
+in a document that only discusses hours per week. 5/5, 5/5, 4/5. **MISSED.**
+
+That's the single most useful thing I did in this unit, and it cost one prompt.
+I'd written the criterion four days earlier specifically to catch this failure
+and I was about to score it in a way that made the catch impossible. Worth
+noting what the model did *not* do: it didn't find the workload file or tell me
+the verdict was wrong. It made the case against me and I went and checked.
+
+**4. Asking what would break the fix, before running it.** Before spending my
+one improvement, I asked why tightening the grounding prompt might not work. The
+answer — that the rule needs the model to check each excerpt against its own
+output, which is harder than listing what looks relevant, and a model that
+skips that check produces the same list regardless — is exactly what happened.
+It didn't stop me making the change, and I don't think it should have; the
+diagnosis pointed there and an untested hypothesis is still worth testing. But
+it meant I'd already worked out what evidence would show the change had failed,
+so when the citation average came back 1.47 both times I knew what I was
+looking at instead of hunting for a reading where it had helped.
 
 ---
 
@@ -587,17 +618,72 @@ behaviour alone.
 
 ## What's Still Broken
 
-<!-- For each criterion still missed after your fix: what you'd do about it,
-     and why you stopped where you did.
+**Criterion 5, still MISSED after the fix.** Answers about PHYS 130 cite
+`course_phys_130_workload.txt` as a source for exam format roughly one run in
+three, and my prompt change didn't move that at all.
 
-     "I ran out of time" is fine if it's true. Pretending nothing is left is
-     not.
+What I'd do next, in the order I'd try it:
 
-     Milestone 5. -->
+1. **Stop asking the model to attribute, and attribute mechanically instead.**
+   This is the one I actually believe in. The model already produces the answer
+   text; I don't need it to also tell me where the text came from, because I can
+   check. After generation, take each retrieved chunk and keep it as a cited
+   source only if the answer's key fact appears in it — the same substring test
+   `scorer.py::judge` already does, pointed at the chunk instead of the answer.
+   That turns citation from something I request into something I compute, and a
+   document that doesn't contain the claim becomes uncitable rather than
+   discouraged. It's also the one option that doesn't depend on the model
+   cooperating, which is precisely what failed here.
+
+2. **Cut top-k from 5 to 3 for this question shape.** The workload file arrives
+   at rank 4. At top-k 3 it isn't in context and can't be cited. I didn't do
+   this because it's a retrieval change aimed at a generation problem, and it
+   would weaken the system everywhere else to fix one question — criterion 1
+   currently passes partly because five chunks give it room.
+
+3. **Split criterion 5 into "names a correct source" and "names no incorrect
+   source".** My run showed these are different measurements — 5/5 on the
+   first, 4/5 on the second — and collapsing them into one number is why I
+   nearly scored it MET.
+
+**Why I stopped here.** The unit allows one improvement and I spent it on the
+prompt. Doing the mechanical-attribution fix as well would be a second change,
+and with two changes in flight I couldn't attribute the result to either. The
+honest version of this unit is one change, measured properly, reported as
+having failed.
+
+I'll also say plainly: I had a better idea than the one I shipped, and I had it
+*after* I'd shipped. The prompt fix was the obvious move from the diagnosis, and
+obvious wasn't the same as effective.
 
 ## What I'd Do Differently
 
-<!-- Knowing what you know now — which of your five criteria would you write
-     differently, and why?
+**Criterion 3 is the one I'd rewrite.** I set it at 4 of 5 and it came in at
+5/5 with the tightest question 0.125 clear of the cutoff, which isn't a test —
+it's a formality. The problem isn't the number, it's the questions: all five
+OUT_OF_SCOPE items are from a different world entirely (Mongolia, diesel
+engines, the World Cup), so refusing them requires nothing of the system. I'd
+rewrite it as **5 of 5 against adjacent questions** — things that share
+campus_life's vocabulary but have no answer in it, like "what's laundry cost at
+the university across town" or "how do I appeal a city parking ticket". That's
+the same property, tested where it could actually fail.
 
-     Milestone 5. -->
+**Criterion 5 I'd write more precisely, and I'd have caught more.** As written
+it turns on how you read one phrase, and I scored it both ways before deciding.
+The version I'd write now names both halves separately: every answer names at
+least one source containing the answer, *and* names no source that doesn't.
+Same intent, no room for me to be generous with myself at 11pm.
+
+**Criterion 1 I'd measure against questions I hadn't tuned on.** It's scored
+against the same five questions I wrote in unit 1 and used all the way through
+Milestone 4, which makes it closer to a memorised test than a held-out one. In
+unit 1 I'd already measured that casual phrasing pushes distances from 0.19 to
+0.54 and I still didn't test against it. That's the finding I had and didn't
+use.
+
+**And one about the tooling, not the criteria.** I nearly trusted a scorer with
+two bugs in four lines of code — one that would crash on an empty answer, one
+that let capitalisation decide correctness. I found them by writing test cases
+for the scorer, which took two minutes. The measuring instrument deserves the
+same scepticism as the thing being measured, and next unit I'd test it before
+I run anything through it rather than after.
