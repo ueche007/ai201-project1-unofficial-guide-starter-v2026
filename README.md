@@ -390,22 +390,95 @@ shortest chunk: 178 chars
 
 ## Verdicts
 
-<!-- MET or MISSED for each of the five, against the target you wrote last
-     unit — not a new one. Plus a sentence on how you decided. That sentence
-     matters most where it was close.
+| # | Criterion | Target | Runs | Verdict | How I decided |
+|---|---|---|---|---|---|
+| 1 | Retrieved chunk contains the answer | 4 of 5 | 5/5, 5/5, 5/5 | **MET** | Checked against the retrieved chunks, not the answer text: for all five questions one of the top-5 chunks literally contains the `expects` string from `questions.py`. Clears the target with one to spare. |
+| 2 | Every answer names a source | 5 of 5 | 5/5, 5/5, 5/5 | **MET** | All 15 question-runs contain at least one `*.txt` filename. Phrasing wandered — "Sources:", "Source:", inline in parentheses — but the criterion asks whether a source is named, not how. |
+| 3 | Gate stops out-of-corpus questions | 4 of 5 | 5/5, 5/5, 5/5 | **MET** | All five OUT_OF_SCOPE questions landed at 0.825–0.934 against a 0.70 cutoff. The nearest miss had 0.125 of margin, so this isn't a close call. |
+| 4 | No chunk is a heading with nothing under it | 0 orphans of 88 | 0/88, 0/88, 0/88 | **MET** | Counted over all 88 chunks, not the 5 I sampled: none under 100 characters, none missing its title line, shortest is 178. The floor in `chunker.py::_pack` makes this true by construction. |
+| 5 | The cited source contains the answer | 5 of 5 | 5/5, 5/5, **4/5** | **MISSED** | Run 3 of the PHYS 130 question cited `course_phys_130_workload.txt`, which says nothing about midterms or finals. Two runs out of three is not the target. |
 
-     If your target said 4 of 5 and your runs came out 4, 3, 4, that's a MISS.
-     The target has to hold, not show up occasionally.
+### How I decided criterion 5, since it's the one that turns on a reading
 
-     Milestone 2. -->
+My first pass scored this 5/5, 5/5, 5/5 and I nearly wrote MET. The lenient
+reading is "did the answer name a correct source" — and it always did, because
+every answer named two or three files and at least one was right.
 
-| # | Criterion | Verdict | How I decided |
-|---|---|---|---|
-| 1 |  |  |  |
-| 2 |  |  |  |
-| 3 |  |  |  |
-| 4 |  |  |  |
-| 5 |  |  |  |
+Then I scored it the strict way: is *every* file it named one that actually
+contains the answer? That gives 5/5, 5/5, 4/5.
+
+I went with the strict reading, because it's what I wrote. The criterion says
+"the document named in the answer is the document that actually contains the
+answer — **not merely a plausible-looking neighbour**", and
+`course_phys_130_workload.txt` is precisely a plausible-looking neighbour: same
+course, adjacent filename, and it contains hours per week rather than exam
+format. If I score that as MET, the clause I wrote to catch this exact failure
+catches nothing, and criterion 5 collapses into criterion 2.
+
+So: **MISSED.** Two good runs and one bad one is not "all 5 of my test
+questions".
+
+## Diagnoses
+
+One miss, criterion 5.
+
+**Stage: generation.** Not retrieval, and I checked rather than assumed —
+retrieval returned `course_phys_130_exams.txt` at rank 1 with the answer in it,
+so everything the model needed was present and correctly ranked. The failure
+happened after that.
+
+**Mechanism.** Retrieval for this question returns three PHYS 130 documents in
+the top five — `course_phys_130.txt`, `course_phys_130_exams.txt` and
+`course_phys_130_workload.txt`. Two of them contain the exam format; the third
+is about workload. The grounding prompt's rule is:
+
+```
+- Name the document your answer came from, using the filename given in each excerpt.
+```
+
+That asks which document the answer came from, but nothing in it rules out
+naming a document that's merely on the same subject. Given three excerpts all
+headed `PHYS 130 Mechanics`, the model treated "documents about this course" as
+"documents supporting this claim" and listed all three. It did this on one run
+of three, which fits: nothing in the prompt forbids it, so whether it happens is
+left to sampling.
+
+**The pattern, and the part I didn't expect.** This only fired on the question
+whose retrieval pulled three documents from the same family. The Calder Annexe
+question pulled two Calder documents and cited both — and both genuinely contain
+`$2.00`, so it scored correct. The failure needs a family member that's
+on-topic but factually irrelevant, and PHYS 130 was the only question that had
+one in its top five.
+
+What's uncomfortable is that my own Unit 1 chunking decision made this more
+likely. Stapling the title line onto every chunk is what lets retrieval tell
+Calder from Aldridge — but it also means all three PHYS 130 chunks announce
+`PHYS 130 Mechanics` at the top, so within a family every chunk looks equally
+citable. The fix for criterion 5's near-duplicate problem in unit 1 is feeding
+criterion 5's over-citation problem in unit 2. I don't think that makes the
+chunking wrong; it means the disambiguation has to happen in the prompt too,
+not only in the chunk.
+
+### On the four I didn't miss
+
+Four of five MET on the first run means my targets had room in them, and I'd
+rather say that than claim the system is excellent.
+
+Criterion 3 is the softest. I set 4 of 5 predicting that a broad corpus would
+let an out-of-scope question drift close on vocabulary alone — I named ibuprofen
+and Rust as the likely leaks. Neither came near: the tightest was 0.825 against
+a 0.70 cutoff. **I'd tighten it to 5 of 5, and add out-of-scope questions
+designed to be adjacent to the corpus rather than obviously foreign** — "what's
+the cheapest dorm laundry at the university across town", "how do I appeal a
+parking ticket in the city" — questions that share vocabulary with campus_life
+but have no answer in it. The current five are from a different world entirely,
+which made the target easy.
+
+Criterion 1 is next softest, for a reason I already had evidence for and didn't
+act on. It's measured against five carefully-written questions, and in unit 1 I
+showed that re-typing the same facts casually pushes distances from 0.19 to
+0.54. **I'd tighten it to 4 of 5 on casually-phrased questions**, which is a
+harder test of the same property.
 
 ## Diagnoses
 
