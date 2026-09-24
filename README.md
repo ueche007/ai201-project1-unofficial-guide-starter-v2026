@@ -49,8 +49,8 @@ never cutting anything at all — 88 documents in, 88 chunks out. The default
 wasn't working badly, it wasn't running.
 
 **The title line is load-bearing.** It is the only place the building or course
-name reliably appears. Look at the laundry document above: the second paragraph
-says "the dryers back up on Sunday evenings" without ever saying *whose* dryers.
+name reliably appears. In the laundry document above, the second paragraph says
+"the dryers back up on Sunday evenings" without ever saying *whose* dryers.
 And that paragraph is not unique — it appears word-for-word in seven different
 dorms' laundry files. I counted the whole corpus: 25 of 183 body paragraphs
 (14%) appear verbatim in more than one document, one of them in nine.
@@ -167,7 +167,7 @@ The bad: no air conditioning, which matters for the first three weeks of Septemb
 Laundry costs $1.75 wash, $1.75 dry, app-based. On noise: moderate; the building is L-shaped and the short wing is much quieter.
 ```
 
-Chunk 3 is the one that makes the case. Its second paragraph — "It's
+Chunk 3 is the one that convinced me. Its second paragraph — "It's
 front-loaded…" — is identical in all nine course workload files. On its own it
 is unattributable. Kept under its title line it is unambiguous.
 
@@ -299,10 +299,10 @@ way and found `course_phys_130_workload.txt`, cited as a source for exam format
 in a document that only discusses hours per week. 5/5, 5/5, 4/5. **MISSED.**
 
 That's the single most useful thing I did in this unit, and it cost one prompt.
-I'd written the criterion four days earlier specifically to catch this failure
-and I was about to score it in a way that made the catch impossible. Worth
-noting what the model did *not* do: it didn't find the workload file or tell me
-the verdict was wrong. It made the case against me and I went and checked.
+I'd written that criterion the day before, specifically to catch this failure,
+and I was about to score it in a way that made the catch impossible. What the
+model didn't do matters as much: it never found the workload file and never told
+me my verdict was wrong. It made the case against me and I went and checked.
 
 **4. Asking what would break the fix, before running it.** Before spending my
 one improvement, I asked why tightening the grounding prompt might not work. The
@@ -586,7 +586,7 @@ specific about how I know.
 
 The same question failed, citing the same file, for the same reason. It moved
 from run 3 to run 2, which is what a sampling difference looks like, not a
-behaviour change. Here is the after run, with the new rule in the prompt:
+behaviour change. This is the after run, with the new rule in the prompt:
 
 ```
 ### How many midterms does PHYS 130 have, and is there a final? — run 2

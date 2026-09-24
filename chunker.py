@@ -213,7 +213,7 @@ def split_documents(documents: list[Document]) -> list[Chunk]:
         if len(doc.text) <= chunk_size:
             pieces = [doc.text.strip()]
         else:
-            # Reserve room for the title we're about to put back on each piece.
+            # Reserve room for the title I put back on each piece below.
             budget = max(chunk_size - len(title) - 2, MIN_CHUNK_CHARS)
             paragraphs = [p.strip() for p in body.split("\n\n") if p.strip()]
             pieces = [
