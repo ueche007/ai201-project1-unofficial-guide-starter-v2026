@@ -502,34 +502,88 @@ harder test of the same property.
 
 ## The Improvement
 
-**What I changed:**
+**What I changed:** One line added to `GROUNDING_INSTRUCTION` in `generate.py`.
+The whole diff is:
 
-**Why I picked it:**
+```diff
+  - Name the document your answer came from, using the filename given in each excerpt.
++ - Name only documents that contain a fact you actually stated. Several excerpts may be
++   about the same building or the same course; if an excerpt does not contain something
++   you said, do not name it, however related it looks.
+  - Be brief. Two or three sentences is usually enough.
+```
 
-<!-- Connect it to a specific diagnosis above in one sentence. If you can't,
-     you picked a fix because it sounded impressive. -->
+Nothing else. `git diff` for this change is one file, one insertion — chunking,
+retrieval, top-k and the cutoff are all untouched.
+
+**Why I picked it:** My diagnosis put the miss in generation — retrieval had
+already returned `course_phys_130_exams.txt` at rank 1 with the answer in it —
+and said the mechanism was a grounding rule that asks which document the answer
+came from without forbidding the naming of a document that's merely on the same
+subject; this adds exactly that prohibition.
+
+I also asked what would stop it working before running it, and the answer I got
+was worth writing down: the rule relies on the model checking each excerpt
+against its own output, which is a harder operation than listing what looks
+relevant, and a model that doesn't do that check will produce the same list
+whatever the prompt says. That turned out to be the right worry.
 
 ### Run Log — After
 
-<!-- Same format, same five criteria, three runs each.
-     `python run_eval.py --label after` -->
+`python run_eval.py --label after` → [`results/run_2026-09-23_2144_after.md`](results/run_2026-09-23_2144_after.md).
+15 model calls, cache off, 9,903 tokens.
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1. Retrieved chunk contains the answer | 4 of 5 |  |  |  |  |
-| 2. Every answer names a source | 5 of 5 |  |  |  |  |
-| 3. Gate stops out-of-corpus questions | 4 of 5 |  |  |  |  |
-| 4. | | | | | |
-| 5. | | | | | |
+| 1. Retrieved chunk contains the answer | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 2. Every answer names a source | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 3. Gate stops out-of-corpus questions | 4 of 5 | 5/5 | 5/5 | 5/5 | MET |
+| 4. No chunk is a heading with nothing under it | 0 orphans of 88 | 0/88 | 0/88 | 0/88 | MET |
+| 5. The cited source contains the answer | 5 of 5 | 5/5 | **4/5** | 5/5 | **MISSED** |
+
+Side by side, criterion 5 is the only row that was ever in question:
+
+| Criterion 5 | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|
+| Before | 5/5 | 5/5 | **4/5** | MISSED |
+| After | 5/5 | **4/5** | 5/5 | MISSED |
 
 **Did it help?**
 
-<!-- Say plainly whether it did, and how you know. If it made things worse,
-     say that — a change that backfired, honestly reported, earns full credit
-     and is more interesting than one that worked. What matters is that you can
-     tell.
+**No.** It didn't help and it didn't hurt — it did nothing, and I can be
+specific about how I know.
 
-     Milestone 4. -->
+The same question failed, citing the same file, for the same reason. It moved
+from run 3 to run 2, which is what a sampling difference looks like, not a
+behaviour change. Here is the after run, with the new rule in the prompt:
+
+```
+### How many midterms does PHYS 130 have, and is there a final? — run 2
+
+- Sources retrieved: course_cs_210_exams.txt, course_phys_130.txt, course_phys_130_exams.txt, course_phys_130_workload.txt, course_stat_150_exams.txt
+
+PHYS 130 has three midterms and no final. 
+
+Sources: `course_phys_130.txt`, `course_phys_130_exams.txt`, `course_phys_130_workload.txt`
+```
+
+That is the same three-file list as before, including the workload file that
+contains no exam information at all.
+
+The measurement I found most convincing isn't the criterion at all. **The
+average number of files cited per answer is 1.47 before and 1.47 after** —
+identical across 15 question-runs each. A prompt rule telling the model to cite
+fewer documents produced no change whatsoever in how many documents it cites.
+That's a stronger signal than the 4/5 moving between runs, because it's averaged
+over all fifteen instead of turning on one.
+
+So the honest reading is that the instruction was not acted on. I can't tell
+from outside whether it was ignored, or whether the model did check and judged
+"Workload for PHYS 130 Mechanics" to support a claim about PHYS 130's
+assessment — the two look identical in the output. What I can say is that adding
+the rule changed nothing measurable, and that a fix which sounded obviously
+correct when I wrote it turned out to be unfalsifiable from the model's
+behaviour alone.
 
 ## What's Still Broken
 
